@@ -1,0 +1,31 @@
+{
+  "name": "megalania",
+  "version": "0.2.0",
+  "description": "Megalania scraping API client, generated from the OpenAPI document.",
+  "license": "MIT",
+  "author": "Megalania",
+  "homepage": "https://docs.megalania.io/guides/sdk-typescript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/megalania/megalania-typescript.git"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "gen": "openapi-typescript ../../target/sdk-v1.yaml --default-non-nullable false --output src/schema.ts",
+    "build": "tsc",
+    "prepare": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

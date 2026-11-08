@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "megalania-v*"
+      - "ai-sdk-v*"
+      - "n8n-nodes-megalania-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+      - name: Build and pack
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "${TAG}" in
+            megalania-v*) dir=. ;;
+            ai-sdk-v*) dir=integrations/ai-sdk ;;
+            n8n-nodes-megalania-v*) dir=integrations/n8n ;;
+            *) echo "unknown tag ${TAG}"; exit 1 ;;
+          esac
+          npm ci --ignore-scripts
+          npm run build
+          cd "${dir}"
+          test "$(jq -r .version package.json)" = "${TAG##*-v}"
+          if [ "${dir}" != . ]; then npm ci --ignore-scripts; fi
+          if [ "${dir}" = integrations/n8n ]; then npx n8n-node lint && npx n8n-node build; elif [ "${dir}" != . ]; then npm run build; fi
+          mkdir -p "${GITHUB_WORKSPACE}/pack"
+          npm pack --ignore-scripts --pack-destination "${GITHUB_WORKSPACE}/pack"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pack
+          path: pack/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: pack
+          path: pack/
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm install -g --ignore-scripts npm@12.2.0
+          npm publish pack/*.tgz --provenance --access public --ignore-scripts

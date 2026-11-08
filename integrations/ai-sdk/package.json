@@ -1,0 +1,36 @@
+{
+  "name": "@megalania/ai-sdk",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK tools for the Megalania scraping API.",
+  "license": "MIT",
+  "author": "Megalania",
+  "homepage": "https://docs.megalania.io/integrations/vercel-ai-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/megalania/megalania-typescript.git",
+    "directory": "integrations/ai-sdk"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc"
+  },
+  "peerDependencies": {
+    "ai": ">=5",
+    "megalania": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "ai": "7.0.148",
+    "megalania": "file:../..",
+    "typescript": "5.9.3"
+  }
+}

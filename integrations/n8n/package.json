@@ -1,0 +1,49 @@
+{
+  "name": "n8n-nodes-megalania",
+  "version": "0.1.0",
+  "description": "n8n node for the Megalania scraping API: scrape pages, map sites, run batches.",
+  "license": "MIT",
+  "homepage": "https://docs.megalania.io/integrations/n8n",
+  "keywords": [
+    "n8n-community-node-package",
+    "scraping",
+    "markdown"
+  ],
+  "author": {
+    "name": "Megalania",
+    "email": "support@megalania.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/megalania/megalania-typescript.git",
+    "directory": "integrations/n8n"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "lint": "n8n-node lint"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/MegalaniaApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Megalania/Megalania.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "0.53.3",
+    "eslint": "9.39.4",
+    "n8n-workflow": "2.16.0",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "yaml": "2.9.1"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
