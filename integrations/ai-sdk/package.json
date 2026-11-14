@@ -1,6 +1,6 @@
 {
   "name": "@megalania/ai-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vercel AI SDK tools for the Megalania scraping API.",
   "license": "MIT",
   "author": "Megalania",
@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "ai": ">=5",
-    "megalania": "^0.2.0"
+    "megalania": "^0.3.0"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

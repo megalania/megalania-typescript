@@ -89,12 +89,16 @@ export class Megalania {
     this.timeout = timeout;
   }
 
-  async #send(url: string, method: string, body?: unknown, key?: string): Promise<Response> {
+  async #send(url: string, method: string, body?: unknown, key?: string, { accept, signal }: { accept?: string; signal?: AbortSignal } = {}): Promise<Response> {
     const headers: Record<string, string> = { Authorization: `Bearer ${this.#apiKey}` };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (key !== undefined) headers["Idempotency-Key"] = key || crypto.randomUUID();
+    if (accept) headers["Accept"] = accept;
     const init: RequestInit = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
-    const send = () => fetch(url, { ...init, signal: AbortSignal.timeout(this.timeout * 1000) });
+    const send = () => {
+      const timeout = AbortSignal.timeout(this.timeout * 1000);
+      return fetch(url, { ...init, signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+    };
     let res = await send();
     if (res.status === 429) {
       const after = res.headers.get("Retry-After")?.trim();
@@ -141,8 +145,24 @@ export class Megalania {
     return this.#json(this.apiUrl, "POST", "/v1/account/webhook-secret/rotate");
   }
 
-  mapSite(body: { url: string } & Json, { idempotencyKey }: Options = {}) {
-    return this.#json(this.baseUrl, "POST", "/v1/map", { body, key: idempotencyKey ?? "" });
+  async mapSite(body: { url: string } & Json, { idempotencyKey, onProgress, signal }: Options & { onProgress?: (line: Json) => void; signal?: AbortSignal } = {}): Promise<Json> {
+    if (!onProgress) return this.#json(this.baseUrl, "POST", "/v1/map", { body, key: idempotencyKey ?? "" });
+    const res = await this.#send(`${this.baseUrl}/v1/map`, "POST", body, idempotencyKey ?? "", { accept: "application/x-ndjson", signal });
+    if (!res.headers.get("Content-Type")?.includes("ndjson")) return (await res.json()) as Json;
+    const requestId = res.headers.get("X-Request-Id") ?? undefined;
+    let rest = "";
+    for await (const chunk of res.body!.pipeThrough(new TextDecoderStream())) {
+      const lines = (rest + chunk).split("\n");
+      rest = lines.pop()!;
+      for (const raw of lines.filter((l) => l.trim())) {
+        const line = JSON.parse(raw) as Json & { error?: { code?: ErrorCode; message?: string } };
+        const { type, request_id: _id, credits_charged: _cr, ...plain } = line;
+        if (type === "progress") onProgress(line);
+        else if (type === "result") return plain;
+        else throw new MegalaniaError(line.error?.message ?? "The map stopped.", 500, line.error?.code, undefined, requestId, undefined, typed(res.headers));
+      }
+    }
+    throw new MegalaniaError("The map stopped before it ended.", 500, undefined, undefined, requestId, undefined, typed(res.headers));
   }
 
   createBatch(body: { urls: string[] } & Omit<Envelope, "url"> & Json, { idempotencyKey }: Options = {}) {
@@ -157,8 +177,8 @@ export class Megalania {
     return this.#json(this.apiUrl, "GET", "/v1/batches", { query });
   }
 
-  getBatch(id: string) {
-    return this.#json(this.apiUrl, "GET", `/v1/batches/${encodeURIComponent(id)}`);
+  getBatch(id: string, { waitSeconds = 0 }: { waitSeconds?: number } = {}) {
+    return this.#json(this.apiUrl, "GET", `/v1/batches/${encodeURIComponent(id)}`, { query: { wait_seconds: waitSeconds || undefined } });
   }
 
   listBatchItems(id: string, query: Query = {}) {
@@ -197,13 +217,13 @@ export class Megalania {
     return this.#json(this.apiUrl, "GET", `/v1/monitors/${encodeURIComponent(id)}/checks`, { query });
   }
 
-  async waitBatch(id: string, { timeout = 3600, poll = 2 }: { timeout?: number; poll?: number } = {}): Promise<Json> {
+  async waitBatch(id: string, { timeout = 3600 }: { timeout?: number } = {}): Promise<Json> {
     const end = performance.now() + timeout * 1000;
     for (;;) {
-      const batch = await this.getBatch(id);
+      const waitSeconds = Math.max(0, Math.min(25, Math.floor((end - performance.now()) / 1000)));
+      const batch = await this.getBatch(id, { waitSeconds });
       if (DONE.includes(String(batch.status))) return batch;
-      if (performance.now() + poll * 1000 > end) throw new Error(`batch ${id} still ${String(batch.status)} after ${timeout} s`);
-      await new Promise((r) => setTimeout(r, poll * 1000));
+      if (waitSeconds === 0) throw new Error(`batch ${id} still ${String(batch.status)} after ${timeout} s`);
     }
   }
 

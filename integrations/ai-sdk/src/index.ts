@@ -42,9 +42,9 @@ export function megalaniaTools({ apiKey, maxCredits = 128, maxPages = 100, maxCh
       }
       return meg.createBatch(body as Parameters<Megalania["createBatch"]>[0]);
     },
-    async get_batch({ batch_id, cursor, limit = 20 }) {
+    async get_batch({ batch_id, cursor, limit = 20, wait_seconds = 0 }) {
       const id = String(batch_id);
-      const batch = await meg.getBatch(id);
+      const batch = await meg.getBatch(id, { waitSeconds: Number(wait_seconds) });
       const page = (await meg.listBatchItems(id, { limit: Number(limit), cursor: cursor as string | undefined })) as { items?: Input[]; next_cursor?: string };
       const items = page.items ?? [];
       const share = Math.floor(maxChars / Math.max(1, items.length));

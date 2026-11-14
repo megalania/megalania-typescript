@@ -277,7 +277,7 @@
   },
   {
     "name": "get_batch",
-    "description": "Read a batch: its status (queued, running, done, failed or canceled) and the content of its finished pages, up to limit pages per call. Pass next_cursor from the last answer to read more. Free.",
+    "description": "Read a batch: its status (queued, running, done, failed or canceled) and the content of its finished pages, up to limit pages per call. Set wait_seconds=25 to wait in this call until the batch ends; a batch still running answers with eta_seconds. Pass next_cursor from the last answer to read more. Free.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -291,6 +291,10 @@
         },
         "limit": {
           "description": "pages per call, default 20, at most 100",
+          "type": "integer"
+        },
+        "wait_seconds": {
+          "description": "wait up to this many seconds, 0 to 25, for the batch to end; the answer comes as soon as it ends. Default 0 answers at once",
           "type": "integer"
         }
       },

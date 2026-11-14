@@ -66,4 +66,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm install -g --ignore-scripts npm@12.2.0
-          npm publish pack/*.tgz --provenance --access public --ignore-scripts
+          npm publish ./pack/*.tgz --provenance --access public --ignore-scripts

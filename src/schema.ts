@@ -130,6 +130,15 @@ export interface paths {
          *     we found no URL and the start page was blocked, failed or an error page (4xx or 5xx) is free; a search
          *     that matches nothing is still charged. The URLs go to you only and are never stored.
          *
+         *     Send Accept: application/x-ndjson to watch the map run. The answer is
+         *     then one JSON object per line: a progress line after each step (type
+         *     progress, stage start_page, robots or sitemap, page_links,
+         *     sitemaps_read, urls_found, credits_so_far and the new sitemap urls),
+         *     then one result line (type result, this body plus request_id and
+         *     credits_charged). An error before the first line is a normal error
+         *     answer. Closing the connection stops the map at its next step; it is
+         *     charged for what it read.
+         *
          *     Error codes bad_parameter, bad_token, blocked, body_too_large, busy, capacity_spent, daily_cost_cap, fetch_error, forbidden_target, free_failures_spent, free_tier_cap, idempotency_mismatch, insufficient_credits, internal, over_concurrency, period_cost_cap, replayed, spend_cap, target_rate_limited, timeout, unavailable, unknown_host, unsupported_media_type, upstream_cap, wrong_scope.
          */
         post: operations["mapSite"];

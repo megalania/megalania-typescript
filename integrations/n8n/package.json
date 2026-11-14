@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-megalania",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "n8n node for the Megalania scraping API: scrape pages, map sites, run batches.",
   "license": "MIT",
   "homepage": "https://docs.megalania.io/integrations/n8n",

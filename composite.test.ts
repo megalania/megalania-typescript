@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { after, before, beforeEach, test } from "node:test";
 import { Megalania, MegalaniaError } from "./src/index.ts";
 
-type Call = { method: string; path: string; query: Record<string, string>; auth?: string; body: unknown };
+type Call = { method: string; path: string; query: Record<string, string>; auth?: string; accept?: string; body: unknown };
 type Answer = [status: number, body: unknown, headers?: Record<string, string>];
 const ID = "0199a1c2-0000-7000-8000-000000000001";
 let routes = new Map<string, Answer[]>();
@@ -20,10 +20,11 @@ function serve(req: IncomingMessage, res: ServerResponse) {
   req.on("data", (c) => (raw += c));
   req.on("end", () => {
     const u = new URL(req.url ?? "/", base);
-    calls.push({ method: req.method!, path: u.pathname, query: Object.fromEntries(u.searchParams), auth: req.headers.authorization, body: raw ? JSON.parse(raw) : null });
+    calls.push({ method: req.method!, path: u.pathname, query: Object.fromEntries(u.searchParams), auth: req.headers.authorization, accept: req.headers.accept, body: raw ? JSON.parse(raw) : null });
     const list = routes.get(`${req.method} ${u.pathname}`);
     if (!list?.length) return res.writeHead(404).end();
     const [status, body, headers] = list.length > 1 ? list.shift()! : list[0]!;
+    if (typeof body === "function") return body(res);
     const text = typeof body === "string" ? body : JSON.stringify(body);
     res.writeHead(status, { "Content-Type": typeof body === "string" ? "text/plain" : "application/json", ...headers }).end(text);
   });
@@ -44,13 +45,37 @@ const all = async <T>(it: AsyncIterable<T>) => {
   return out;
 };
 
+test("mapSite with onProgress sees each progress line, returns the plain answer, and the signal cancels it", async () => {
+  const plain = { urls: [{ url: "https://a.test/p", source: "sitemap" }], truncated: false };
+  const lines = [{ type: "progress", stage: "start_page", urls: [] }, { type: "progress", stage: "sitemap", urls: plain.urls }, { type: "result", ...plain, request_id: "r1", credits_charged: 4 }];
+  add("POST", "/v1/map", plain);
+  add("POST", "/v1/map", lines.map((l) => JSON.stringify(l) + "\n").join(""), 200, { "Content-Type": "application/x-ndjson" });
+  let closed!: () => void;
+  const gone = new Promise<void>((ok) => (closed = ok));
+  add("POST", "/v1/map", (res: ServerResponse) => {
+    res.on("close", closed);
+    res.writeHead(200, { "Content-Type": "application/x-ndjson" }).write(JSON.stringify(lines[0]) + "\n");
+  });
+  const m = client();
+  const seen: string[] = [];
+  assert.deepEqual(await m.mapSite({ url: "https://a.test/" }), plain);
+  assert.deepEqual(await m.mapSite({ url: "https://a.test/" }, { onProgress: (l) => seen.push(String(l.stage)) }), plain);
+  assert.deepEqual(seen, ["start_page", "sitemap"]);
+  assert.deepEqual(calls.map((c) => c.accept), ["*/*", "application/x-ndjson"]);
+  const cancel = new AbortController();
+  await assert.rejects(m.mapSite({ url: "https://a.test/" }, { onProgress: () => cancel.abort(), signal: cancel.signal }), { name: "AbortError" });
+  await gone;
+});
+
 test("waitBatch returns on a terminal status and times out on a running one", async () => {
   for (const s of ["queued", "running", "done"]) add("GET", `/v1/batches/${ID}`, { id: ID, status: s });
-  assert.equal((await client().waitBatch(ID, { poll: 0.01 })).status, "done");
-  assert.equal(calls.length, 3);
+  assert.equal((await client().waitBatch(ID)).status, "done");
+  assert.deepEqual(calls.map((c) => c.query.wait_seconds), ["25", "25", "25"]);
   routes = new Map();
+  calls = [];
   add("GET", `/v1/batches/${ID}`, { id: ID, status: "running" });
-  await assert.rejects(client().waitBatch(ID, { timeout: 0.05, poll: 0.01 }), /still running/);
+  await assert.rejects(client().waitBatch(ID, { timeout: 0.05 }), /still running/);
+  assert.deepEqual(calls.map((c) => c.query.wait_seconds), [undefined]);
 });
 
 test("batchResults skips items with no link, follows the cursor, and fetches results without the key", async () => {

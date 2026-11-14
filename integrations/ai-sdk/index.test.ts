@@ -5,15 +5,15 @@ import { megalaniaTools } from "./src/index.ts";
 
 type Answer = { status?: number; body: string; headers?: Record<string, string> };
 const ID = "0199a1c2-0000-7000-8000-000000000001";
-const calls: { method?: string; path: string; body: Record<string, unknown> | null }[] = [];
+const calls: { method?: string; path: string; query: string; body: Record<string, unknown> | null }[] = [];
 let routes: Record<string, Answer> = {};
 let base = "";
 const server = createServer((req: IncomingMessage, res: ServerResponse) => {
   let raw = "";
   req.on("data", (c) => (raw += c));
   req.on("end", () => {
-    const path = new URL(req.url ?? "/", "http://localhost").pathname;
-    calls.push({ method: req.method, path, body: raw ? JSON.parse(raw) : null });
+    const { pathname: path, search: query } = new URL(req.url ?? "/", "http://localhost");
+    calls.push({ method: req.method, path, query, body: raw ? JSON.parse(raw) : null });
     const a = routes[`${req.method} ${path}`] ?? { status: 404, body: JSON.stringify({ error: { code: "not_found", message: "no route" } }) };
     res.writeHead(a.status ?? 200, { "Content-Type": "application/json", ...a.headers }).end(a.body);
   });
@@ -90,7 +90,8 @@ test("get_batch returns status and page content", async () => {
     [`GET /v1/batches/${ID}/items`]: { body: JSON.stringify({ items: [{ url: "https://a.test/", status: "done", result_url: `${base}/r/1` }], next_cursor: null }) },
     "GET /r/1": { body: "# A" },
   };
-  const out = await exec(tools().get_batch, { batch_id: ID });
+  const out = await exec(tools().get_batch, { batch_id: ID, wait_seconds: 25 });
+  assert.equal(calls[0].query, "?wait_seconds=25");
   assert.equal(out.status, "done");
   assert.equal((out.items as Record<string, unknown>[])[0].content, "# A");
 });
